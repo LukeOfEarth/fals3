@@ -52,3 +52,8 @@
 # - linear.api-key
 # - github.org
 # - github.repo
+
+# Dolt SQL server — pinned port avoids flaky auto-start (changing port / circuit breaker).
+# Lifecycle: bd dolt start | bd dolt status | bd dolt test | bd dolt stop | bd dolt killall
+dolt:
+  port: 47330

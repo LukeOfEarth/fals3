@@ -8,6 +8,16 @@ Beads is issue tracking that lives in your repo, making it perfect for AI coding
 
 **Learn more:** [github.com/steveyegge/beads](https://github.com/steveyegge/beads)
 
+## Dolt server (troubleshooting)
+
+Beads talks to a local **Dolt SQL server**. If `bd` prints `Dolt server unreachable`, `circuit breaker is open`, or `connection refused`:
+
+1. **Pin the port** (team default in `.beads/config.yaml`): `bd dolt set port <port> --update-config` — use a free port (this repo uses **47330**).
+2. **Clean up zombies**, then start: `bd dolt killall` → `bd dolt start` → `bd dolt test`.
+3. **Confirm**: `bd dolt show` should report the server reachable.
+
+Keep one server on the pinned port; multiple auto-started instances on random ports race and drop connections.
+
 ## Quick Start
 
 ### Essential Commands
