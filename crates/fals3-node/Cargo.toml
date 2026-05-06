@@ -1,0 +1,29 @@
+[package]
+name = "fals3-node"
+description = "NAPI-RS bindings exposing fals3-core to Node.js / NPM"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+# NAPI-RS requires a cdylib for the .node binary
+[lib]
+crate-type = ["cdylib"]
+
+[lints.rust]
+# Workspace forbids `unsafe_code`, but napi-rs FFI helpers (e.g.
+# `JsError::throw_into`) are inherently unsafe and unavoidable in this layer.
+# Allow it only here; everything else still inherits the workspace lints.
+unsafe_code = "allow"
+
+[lints.clippy]
+all = { level = "warn", priority = -1 }
+pedantic = { level = "warn", priority = -1 }
+
+[dependencies]
+fals3-core = { path = "../fals3-core" }
+napi = { version = "2", features = ["async"] }
+napi-derive = "2"
+
+[build-dependencies]
+napi-build = "2"
