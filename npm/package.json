@@ -1,5 +1,5 @@
 {
-  "name": "fals3",
+  "name": "fals3y",
   "version": "0.1.0",
   "description": "S3 behavioral simulator for local testing — Rust core, NAPI-RS native addon",
   "license": "MIT",
@@ -32,23 +32,44 @@
     "helpers.d.ts",
     "sdk-shim.js",
     "sdk-shim.d.ts",
-    "README.md",
-    "*.node"
+    "README.md"
   ],
+  "napi": {
+    "binaryName": "fals3y",
+    "targets": [
+      "x86_64-apple-darwin",
+      "aarch64-apple-darwin",
+      "x86_64-unknown-linux-gnu",
+      "aarch64-unknown-linux-gnu",
+      "x86_64-pc-windows-msvc"
+    ],
+    "package": {
+      "name": "fals3y"
+    }
+  },
   "optionalDependencies": {
-    "fals3-darwin-arm64": "0.1.0",
-    "fals3-linux-x64-gnu": "0.1.0",
-    "fals3-win32-x64-msvc": "0.1.0"
+    "fals3y-darwin-arm64": "0.1.0",
+    "fals3y-darwin-x64": "0.1.0",
+    "fals3y-linux-x64-gnu": "0.1.0",
+    "fals3y-linux-arm64-gnu": "0.1.0",
+    "fals3y-win32-x64-msvc": "0.1.0"
   },
   "devDependencies": {
+    "@napi-rs/cli": "^2.18.4",
     "vitest": "^2.0.0",
     "typescript": "^5.0.0"
   },
   "scripts": {
+    "artifacts": "napi artifacts",
     "build": "napi build --platform --release",
     "build:debug": "napi build --platform",
+    "build:native": "cargo build -p fals3-node --manifest-path ../Cargo.toml --release && node -e \"const fs=require('fs');const src=process.platform==='darwin'?'../target/release/libfals3_node.dylib':process.platform==='linux'?'../target/release/libfals3_node.so':'../target/release/fals3_node.dll';fs.copyFileSync(src,'fals3y.node');console.log('copied',src,'-> fals3y.node');\"",
+    "create-npm-dirs": "napi create-npm-dirs",
+    "pack:local": "npm run build:native && npm pack",
+    "prepublishOnly": "napi prepublish -t npm --skip-gh-release",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "version": "napi version"
   },
   "keywords": [
     "s3",
@@ -60,6 +81,10 @@
   ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/fals3/fals3"
+    "url": "https://github.com/LukeOfEarth/fals3"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
   }
 }

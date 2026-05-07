@@ -13,7 +13,7 @@ export interface SdkCommand<TInput = unknown, TOutput = unknown> {
 }
 
 export interface Fals3S3ClientOptions {
-  /** Defaults to `'fals3'`. Mostly cosmetic — fals3 doesn't sign anything. */
+  /** Defaults to `'fals3y'`. Mostly cosmetic — fals3y doesn't sign anything. */
   region?: string;
   [key: string]: unknown;
 }
@@ -26,8 +26,8 @@ export interface Fals3S3ClientOptions {
  *
  * @example
  * ```ts
- * import { Fals3 } from 'fals3';
- * import { Fals3S3Client } from 'fals3/sdk-shim';
+ * import { Fals3 } from 'fals3y';
+ * import { Fals3S3Client } from 'fals3y/sdk-shim';
  * import { GetObjectCommand, PutObjectCommand } from '@aws-sdk/client-s3';
  *
  * const fals3 = Fals3.open({ baseDir: '/tmp/fals3' });

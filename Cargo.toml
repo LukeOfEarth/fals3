@@ -9,7 +9,7 @@ members = [
 version = "0.1.0"
 edition = "2021"
 license = "MIT"
-repository = "https://github.com/fals3/fals3"
+repository = "https://github.com/LukeOfEarth/fals3"
 
 [workspace.lints.rust]
 unsafe_code = "forbid"
@@ -17,3 +17,28 @@ unsafe_code = "forbid"
 [workspace.lints.clippy]
 all = { level = "warn", priority = -1 }
 pedantic = { level = "warn", priority = -1 }
+
+# ── Release profile tuned for shipping a small NAPI-RS .node binary ─────────
+#
+# Rationale (matches the napi-rs/package-template + @napi-rs/canvas defaults):
+#   * `lto = true`       — link-time optimization deletes dead code across
+#                          crate boundaries.  Single biggest size win
+#                          (typically 30–50% on NAPI projects).
+#   * `codegen-units = 1`— sequential codegen unlocks aggressive inlining /
+#                          dead-code elimination at the cost of compile time.
+#                          We rebuild infrequently (CI), so this is fine.
+#   * `strip = "symbols"`— remove debug symbols from the .dylib/.so/.dll.
+#                          Free 20–30% reduction on macOS/Linux.
+#
+# Deliberately NOT set:
+#   * `panic = "abort"`  — napi-rs converts Rust panics into JS exceptions
+#                          via an unwind hook.  `abort` would terminate the
+#                          Node process on a panic, which is unsafe for a
+#                          library used in test suites.
+#   * `opt-level = "z"`  — we prioritise runtime speed over the last few KB.
+#                          The default opt-level = 3 keeps the test-suite
+#                          throughput high.
+[profile.release]
+lto           = true
+codegen-units = 1
+strip         = "symbols"

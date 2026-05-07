@@ -1,0 +1,27 @@
+{
+  "name": "fals3y-darwin-arm64",
+  "version": "0.1.0",
+  "description": "Native binding for fals3y on darwin-arm64",
+  "license": "MIT",
+  "main": "fals3y.darwin-arm64.node",
+  "files": [
+    "fals3y.darwin-arm64.node"
+  ],
+  "os": [
+    "darwin"
+  ],
+  "cpu": [
+    "arm64"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/LukeOfEarth/fals3"
+  }
+}

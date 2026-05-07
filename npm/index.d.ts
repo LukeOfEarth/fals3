@@ -164,7 +164,7 @@ export interface ListPartsOutput {
  *
  * @example
  * ```ts
- * import { Fals3 } from 'fals3';
+ * import { Fals3 } from 'fals3y';
  *
  * const s3 = Fals3.open({ baseDir: '/tmp/fals3-test' });
  * s3.createBucket('my-bucket');

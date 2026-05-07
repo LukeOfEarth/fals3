@@ -35,7 +35,7 @@ describe('Fals3S3Client (AWS SDK v3 shim)', () => {
   });
 
   it('exposes config + middlewareStack stubs', () => {
-    expect(client.config.region).toBe('fals3');
+    expect(client.config.region).toBe('fals3y');
     expect(typeof client.middlewareStack.add).toBe('function');
     expect(() => client.destroy()).not.toThrow();
   });

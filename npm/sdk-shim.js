@@ -63,7 +63,7 @@ function normalizeBody(body) {
   if (body instanceof Uint8Array) return Buffer.from(body);
   if (typeof body === 'string') return Buffer.from(body);
   throw new TypeError(
-    'fals3/sdk-shim: Body must be a Buffer, Uint8Array, or string. ' +
+    'fals3y/sdk-shim: Body must be a Buffer, Uint8Array, or string. ' +
     'Streams must be resolved by the caller before calling send().',
   );
 }
@@ -313,7 +313,7 @@ class Fals3S3Client {
     }
     this._fals3 = fals3;
     this.config = {
-      region: options.region ?? 'fals3',
+      region: options.region ?? 'fals3y',
       endpoint: 'fals3://local',
       requestHandler: { destroy: () => {} },
       ...options,

@@ -1,8 +1,26 @@
-# fals3
+# fals3y
+
+[![CI](https://github.com/LukeOfEarth/fals3/actions/workflows/ci.yml/badge.svg)](https://github.com/LukeOfEarth/fals3/actions/workflows/ci.yml)
+[![npm](https://img.shields.io/npm/v/fals3y.svg)](https://www.npmjs.com/package/fals3y)
+[![license](https://img.shields.io/npm/l/fals3y.svg)](./LICENSE)
 
 **S3 behavioral simulator for local testing.** Pure-Rust core compiled to a Node.js native addon. Runs in-process, no network, no Docker.
 
-`fals3` materialises buckets and objects on the local filesystem and gives you the same API surface and error shapes you'd assert against real S3 — so your tests don't have to care whether they're hitting AWS, LocalStack, or this.
+`fals3y` materialises buckets and objects on the local filesystem and gives you the same API surface and error shapes you'd assert against real S3 — so your tests don't have to care whether they're hitting AWS, LocalStack, or this.
+
+## Supported platforms
+
+Prebuilt binaries are published for:
+
+| OS | Arch | npm package |
+|---|---|---|
+| macOS | arm64 (Apple Silicon) | `fals3y-darwin-arm64` |
+| macOS | x64 (Intel) | `fals3y-darwin-x64` |
+| Linux | x64 (glibc) | `fals3y-linux-x64-gnu` |
+| Linux | arm64 (glibc) | `fals3y-linux-arm64-gnu` |
+| Windows | x64 | `fals3y-win32-x64-msvc` |
+
+Other targets (musl-linux, freebsd, win32-arm64) are not yet built — file an issue if you need one.
 
 ## Why
 
@@ -23,8 +41,8 @@ Prebuilt binaries for `darwin-arm64`, `linux-x64-gnu`, and `win32-x64-msvc` inst
 ## Quickstart
 
 ```ts
-import { Fals3 } from 'fals3';
-import { createTempStore } from 'fals3/helpers';
+import { Fals3 } from 'fals3y';
+import { createTempStore } from 'fals3y/helpers';
 
 const { s3, cleanup } = createTempStore();
 
@@ -46,7 +64,7 @@ All methods are **synchronous**. They throw on error; see [Error handling](#erro
 ### Open a store
 
 ```ts
-import { Fals3 } from 'fals3';
+import { Fals3 } from 'fals3y';
 
 const s3 = Fals3.open({ baseDir: '/tmp/fals3-test' });
 ```
@@ -216,7 +234,7 @@ ETag values may be supplied with or without surrounding double quotes. The wildc
 Non-S3 utilities for tests, exported from `fals3/helpers`:
 
 ```ts
-import { createTempStore, reset, listAll, snapshot } from 'fals3/helpers';
+import { createTempStore, reset, listAll, snapshot } from 'fals3y/helpers';
 
 const { s3, baseDir, cleanup } = createTempStore();
 // ... run tests ...
@@ -236,7 +254,7 @@ expect(snapshot(s3, baseDir)).toMatchSnapshot();
 
 ```ts
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { createTempStore } from 'fals3/helpers';
+import { createTempStore } from 'fals3y/helpers';
 
 describe('upload pipeline', () => {
   let store: ReturnType<typeof createTempStore>;
@@ -293,8 +311,8 @@ The full code list is exported as the `Fals3ErrorCode` type from `fals3`.
 `fals3/sdk-shim` ships a `Fals3S3Client` that's a drop-in replacement for `@aws-sdk/client-s3`'s `S3Client`. Test code that already uses the SDK command pattern works unchanged — only the client construction line differs.
 
 ```ts
-import { Fals3 } from 'fals3';
-import { Fals3S3Client } from 'fals3/sdk-shim';
+import { Fals3 } from 'fals3y';
+import { Fals3S3Client } from 'fals3y/sdk-shim';
 import {
   GetObjectCommand,
   PutObjectCommand,
@@ -333,7 +351,7 @@ try {
 Need a command we don't yet handle? Register a one-off handler:
 
 ```ts
-import { Fals3S3Client } from 'fals3/sdk-shim';
+import { Fals3S3Client } from 'fals3y/sdk-shim';
 
 Fals3S3Client.registerCommand('SelectObjectContentCommand', (s3, input) => {
   // Custom implementation against the underlying Fals3 instance.

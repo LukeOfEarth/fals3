@@ -1,0 +1,7 @@
+[toolchain]
+# Pin to a specific stable for reproducible CI builds.  Bump deliberately
+# when we want a newer compiler — release artifacts will rebuild against
+# whatever this file says.
+channel = "1.88.0"
+profile = "minimal"
+components = ["rustfmt", "clippy"]

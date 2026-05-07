@@ -1,0 +1,30 @@
+{
+  "name": "fals3y-linux-x64-gnu",
+  "version": "0.1.0",
+  "description": "Native binding for fals3y on linux-x64 (glibc)",
+  "license": "MIT",
+  "main": "fals3y.linux-x64-gnu.node",
+  "files": [
+    "fals3y.linux-x64-gnu.node"
+  ],
+  "os": [
+    "linux"
+  ],
+  "cpu": [
+    "x64"
+  ],
+  "libc": [
+    "glibc"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/LukeOfEarth/fals3"
+  }
+}

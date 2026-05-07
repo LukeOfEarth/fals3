@@ -22,7 +22,10 @@ pedantic = { level = "warn", priority = -1 }
 
 [dependencies]
 fals3-core = { path = "../fals3-core" }
-napi = { version = "2", features = ["async"] }
+# `default-features = false` drops the heavy `async`/tokio feature.  We chose
+# a synchronous NAPI surface in DECISIONS.md §3, so tokio isn't needed and
+# pulling it in inflated the .node binary by ~500 KB.
+napi = { version = "2", default-features = false, features = ["napi8"] }
 napi-derive = "2"
 
 [build-dependencies]

@@ -1,0 +1,169 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      dry-run:
+        description: 'Skip the npm publish step (build + verify only)'
+        type: boolean
+        default: false
+
+# Required for npm provenance attestations.  Without this the publish step
+# falls back to non-attested mode.
+permissions:
+  contents: read
+  id-token: write
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    name: Build ${{ matrix.target }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: aarch64-apple-darwin
+            runner: macos-14
+            suffix: darwin-arm64
+            cross: false
+          - target: x86_64-apple-darwin
+            runner: macos-13
+            suffix: darwin-x64
+            cross: false
+          - target: x86_64-unknown-linux-gnu
+            runner: ubuntu-latest
+            suffix: linux-x64-gnu
+            cross: false
+          - target: aarch64-unknown-linux-gnu
+            runner: ubuntu-latest
+            suffix: linux-arm64-gnu
+            cross: true
+          - target: x86_64-pc-windows-msvc
+            runner: windows-latest
+            suffix: win32-x64-msvc
+            cross: false
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Add Rust target
+        run: rustup target add ${{ matrix.target }}
+
+      - name: Cache cargo registry + target
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: ". -> target"
+          key: ${{ matrix.target }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: npm/package-lock.json
+
+      - name: Install JS deps
+        working-directory: npm
+        run: npm ci
+
+      # Linux ARM64 cross-compile: install the ARM cross toolchain.
+      # Native targets (matrix.cross == false) skip this step.
+      - name: Install aarch64 GCC cross toolchain
+        if: matrix.cross && matrix.target == 'aarch64-unknown-linux-gnu'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-aarch64-linux-gnu g++-aarch64-linux-gnu
+          mkdir -p ~/.cargo
+          {
+            echo '[target.aarch64-unknown-linux-gnu]'
+            echo 'linker = "aarch64-linux-gnu-gcc"'
+          } >> ~/.cargo/config.toml
+
+      - name: Build native addon
+        working-directory: npm
+        run: npx napi build --platform --release --target ${{ matrix.target }}
+        env:
+          # Cross-compile linker hints picked up by napi-rs.
+          CC_aarch64_unknown_linux_gnu: aarch64-linux-gnu-gcc
+          CXX_aarch64_unknown_linux_gnu: aarch64-linux-gnu-g++
+
+      - name: Sanity check binary exists
+        shell: bash
+        working-directory: npm
+        run: |
+          ls -la fals3y.*.node
+          test -f "fals3y.${{ matrix.suffix }}.node"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: fals3y-${{ matrix.suffix }}
+          path: npm/fals3y.${{ matrix.suffix }}.node
+          if-no-files-found: error
+          retention-days: 7
+
+  publish:
+    name: Publish to npm
+    runs-on: ubuntu-latest
+    needs: build
+    # Skip publish when invoked manually with dry-run = true.
+    if: ${{ github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.dry-run == false) }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          registry-url: 'https://registry.npmjs.org/'
+          cache: npm
+          cache-dependency-path: npm/package-lock.json
+
+      - name: Install JS deps
+        working-directory: npm
+        run: npm ci
+
+      - name: Download all build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: npm/artifacts
+
+      - name: Move artifacts into platform package dirs
+        working-directory: npm
+        run: npx napi artifacts -d artifacts
+
+      - name: Verify each platform package has its binary
+        working-directory: npm
+        shell: bash
+        run: |
+          set -e
+          for triple in darwin-arm64 darwin-x64 linux-x64-gnu linux-arm64-gnu win32-x64-msvc; do
+            f="npm/${triple}/fals3y.${triple}.node"
+            test -f "$f" || { echo "MISSING: $f"; exit 1; }
+            echo "ok  $f  ($(stat -c%s "$f" 2>/dev/null || stat -f%z "$f") bytes)"
+          done
+
+      - name: Publish platform packages
+        working-directory: npm
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        shell: bash
+        run: |
+          set -e
+          for dir in npm/*/; do
+            echo "── publishing $dir ──"
+            (cd "$dir" && npm publish --access public --provenance)
+          done
+
+      - name: Publish main package
+        working-directory: npm
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        # `prepublishOnly` runs `napi prepublish -t npm --skip-gh-release`
+        # which patches the main package.json's optionalDependencies versions
+        # to match the just-released versions.
+        run: npm publish --access public --provenance
