@@ -15,8 +15,12 @@ repository = "https://github.com/LukeOfEarth/fals3"
 unsafe_code = "forbid"
 
 [workspace.lints.clippy]
+# `clippy::all` covers correctness / suspicious / style / complexity / perf.
+# The pedantic group was enabled earlier but tripped on dozens of stylistic
+# preferences — turned off for v1 to keep CI signal:noise high.  Re-enable
+# selectively (e.g. `pedantic = { level = "warn", priority = -1 }`) when we
+# want to lint-clean the codebase against it.
 all = { level = "warn", priority = -1 }
-pedantic = { level = "warn", priority = -1 }
 
 # ── Release profile tuned for shipping a small NAPI-RS .node binary ─────────
 #

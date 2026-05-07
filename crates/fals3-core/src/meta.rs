@@ -113,7 +113,7 @@ impl ObjectMeta {
 /// Compute `"<md5-hex>"` ETag from body bytes (matches AWS S3 single-part uploads).
 pub fn compute_etag(body: &[u8]) -> String {
     let digest = md5::compute(body);
-    format!("\"{:x}\"", digest)
+    format!("\"{digest:x}\"")
 }
 
 /// Raw 16-byte MD5 digest of `body`, used to build multipart ETags.
@@ -134,7 +134,8 @@ pub fn compute_multipart_etag(part_md5s: &[[u8; 16]]) -> String {
         concat.extend_from_slice(d);
     }
     let final_md5 = md5::compute(&concat);
-    format!("\"{:x}-{}\"", final_md5, part_md5s.len())
+    let n = part_md5s.len();
+    format!("\"{final_md5:x}-{n}\"")
 }
 
 #[cfg(test)]
@@ -150,7 +151,10 @@ mod tests {
     #[test]
     fn etag_hello() {
         // MD5("hello") = 5d41402abc4b2a76b9719d911017c592
-        assert_eq!(compute_etag(b"hello"), "\"5d41402abc4b2a76b9719d911017c592\"");
+        assert_eq!(
+            compute_etag(b"hello"),
+            "\"5d41402abc4b2a76b9719d911017c592\""
+        );
     }
 
     #[test]
@@ -169,7 +173,10 @@ mod tests {
         let loaded = ObjectMeta::read(&sidecar).unwrap();
         assert_eq!(loaded.etag, original.etag);
         assert_eq!(loaded.content_type, Some("text/plain".into()));
-        assert_eq!(loaded.user_metadata.get("uid").map(String::as_str), Some("42"));
+        assert_eq!(
+            loaded.user_metadata.get("uid").map(String::as_str),
+            Some("42")
+        );
         assert_eq!(loaded.size, 11);
         assert_eq!(loaded.storage_class, "STANDARD");
     }

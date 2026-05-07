@@ -40,7 +40,7 @@ use fals3_core::{
 /// re-uses the already-thrown exception instead of constructing a new one.
 fn throw_aws_err(env: Env, e: Fals3Error) -> napi::Error {
     let code = e.code().to_string();
-    let message = format!("[{}] {}", code, e);
+    let message = format!("[{code}] {e}");
     let custom: napi::Error<String> = napi::Error::new(code, message);
     unsafe { napi::JsError::<String>::from(custom).throw_into(env.raw()) };
     napi::Error::new(napi::Status::PendingException, String::new())
@@ -235,6 +235,10 @@ impl Fals3 {
     /// `conditions` (optional) accepts precondition headers — most usefully
     /// `ifNoneMatch: '*'` (atomic create) or `ifMatch: <etag>` (optimistic
     /// concurrency).  Failed preconditions throw with `err.code === 'PreconditionFailed'`.
+    // The signature shape is dictated by the NAPI surface (each parameter maps
+    // to a positional JS argument); collapsing into a struct would force every
+    // JS call-site to construct an options object.
+    #[allow(clippy::too_many_arguments)]
     #[napi]
     pub fn put_object(
         &self,
@@ -367,6 +371,7 @@ impl Fals3 {
     ///
     /// `sourceConditions` (optional) accepts precondition headers evaluated
     /// against the **source** object (mirrors S3's `x-amz-copy-source-if-*`).
+    #[allow(clippy::too_many_arguments)]
     #[napi]
     pub fn copy_object(
         &self,

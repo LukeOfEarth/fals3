@@ -81,7 +81,9 @@ fn pagination_6_objects_3_pages() {
     let store = Store::open(dir.path()).unwrap();
 
     store
-        .create_bucket(CreateBucketInput { bucket: "test".into() })
+        .create_bucket(CreateBucketInput {
+            bucket: "test".into(),
+        })
         .unwrap();
 
     let keys = ["a", "b", "c", "d", "e", "f"];
@@ -207,7 +209,11 @@ fn error_code_invalid_bucket_name() {
 #[test]
 fn error_code_no_such_key() {
     assert_eq!(
-        Fals3Error::NoSuchKey { bucket: "b".into(), key: "k".into() }.code(),
+        Fals3Error::NoSuchKey {
+            bucket: "b".into(),
+            key: "k".into()
+        }
+        .code(),
         "NoSuchKey"
     );
 }
@@ -237,7 +243,10 @@ fn error_code_not_modified() {
 #[test]
 fn error_code_no_such_upload() {
     assert_eq!(
-        Fals3Error::NoSuchUpload { upload_id: "u".into() }.code(),
+        Fals3Error::NoSuchUpload {
+            upload_id: "u".into()
+        }
+        .code(),
         "NoSuchUpload"
     );
 }
@@ -267,7 +276,7 @@ fn error_code_path_escape() {
 
 #[test]
 fn error_code_io_internal() {
-    let e = Fals3Error::Io(std::io::Error::new(std::io::ErrorKind::Other, "disk full"));
+    let e = Fals3Error::Io(std::io::Error::other("disk full"));
     assert_eq!(e.code(), "InternalError");
 }
 
@@ -292,7 +301,9 @@ fn cond_store_with_object() -> (tempfile::TempDir, Store, String, u64) {
     let dir = tempfile::tempdir().unwrap();
     let store = Store::open(dir.path()).unwrap();
     store
-        .create_bucket(CreateBucketInput { bucket: "bkt".into() })
+        .create_bucket(CreateBucketInput {
+            bucket: "bkt".into(),
+        })
         .unwrap();
     let put = store
         .put_object(PutObjectInput {
@@ -471,8 +482,10 @@ fn put_if_none_match_star_fails_when_object_exists() {
 fn put_if_none_match_star_succeeds_when_object_absent() {
     let dir = tempfile::tempdir().unwrap();
     let s = Store::open(dir.path()).unwrap();
-    s.create_bucket(CreateBucketInput { bucket: "bkt".into() })
-        .unwrap();
+    s.create_bucket(CreateBucketInput {
+        bucket: "bkt".into(),
+    })
+    .unwrap();
     s.put_object(PutObjectInput {
         bucket: "bkt".into(),
         key: "k".into(),
@@ -530,8 +543,10 @@ fn put_if_match_fails_with_stale_etag() {
 fn put_if_match_fails_when_object_absent() {
     let dir = tempfile::tempdir().unwrap();
     let s = Store::open(dir.path()).unwrap();
-    s.create_bucket(CreateBucketInput { bucket: "bkt".into() })
-        .unwrap();
+    s.create_bucket(CreateBucketInput {
+        bucket: "bkt".into(),
+    })
+    .unwrap();
     let err = s
         .put_object(PutObjectInput {
             bucket: "bkt".into(),
@@ -607,8 +622,10 @@ fn etag_quote_normalisation_in_if_match() {
 fn mp_store_with_bucket() -> (tempfile::TempDir, Store) {
     let dir = tempfile::tempdir().unwrap();
     let s = Store::open(dir.path()).unwrap();
-    s.create_bucket(CreateBucketInput { bucket: "bkt".into() })
-        .unwrap();
+    s.create_bucket(CreateBucketInput {
+        bucket: "bkt".into(),
+    })
+    .unwrap();
     (dir, s)
 }
 
@@ -662,8 +679,14 @@ fn multipart_full_roundtrip() {
         .complete_multipart_upload(CompleteMultipartUploadInput {
             upload_id: create.upload_id.clone(),
             parts: vec![
-                CompletedPart { part_number: 1, etag: p1.etag.clone() },
-                CompletedPart { part_number: 2, etag: p2.etag.clone() },
+                CompletedPart {
+                    part_number: 1,
+                    etag: p1.etag.clone(),
+                },
+                CompletedPart {
+                    part_number: 2,
+                    etag: p2.etag.clone(),
+                },
             ],
         })
         .unwrap();
@@ -680,8 +703,14 @@ fn multipart_full_roundtrip() {
         .unwrap();
     assert_eq!(got.body, b"hello world");
     assert_eq!(got.meta.etag, complete.etag);
-    assert_eq!(got.meta.content_type, Some("application/octet-stream".into()));
-    assert_eq!(got.meta.user_metadata.get("k").map(String::as_str), Some("v"));
+    assert_eq!(
+        got.meta.content_type,
+        Some("application/octet-stream".into())
+    );
+    assert_eq!(
+        got.meta.user_metadata.get("k").map(String::as_str),
+        Some("v")
+    );
     assert_eq!(got.meta.size, 11);
 }
 
@@ -706,7 +735,10 @@ fn multipart_metadata_preserved_through_complete() {
         .unwrap();
     s.complete_multipart_upload(CompleteMultipartUploadInput {
         upload_id: create.upload_id,
-        parts: vec![CompletedPart { part_number: 1, etag: p.etag }],
+        parts: vec![CompletedPart {
+            part_number: 1,
+            etag: p.etag,
+        }],
     })
     .unwrap();
 
@@ -719,7 +751,10 @@ fn multipart_metadata_preserved_through_complete() {
         .unwrap();
     assert_eq!(meta.content_type, Some("image/png".into()));
     assert_eq!(meta.content_encoding, Some("gzip".into()));
-    assert_eq!(meta.user_metadata.get("uid").map(String::as_str), Some("42"));
+    assert_eq!(
+        meta.user_metadata.get("uid").map(String::as_str),
+        Some("42")
+    );
 }
 
 #[test]
@@ -785,7 +820,10 @@ fn complete_rejects_unknown_upload() {
     let err = s
         .complete_multipart_upload(CompleteMultipartUploadInput {
             upload_id: "ghost".into(),
-            parts: vec![CompletedPart { part_number: 1, etag: "\"x\"".into() }],
+            parts: vec![CompletedPart {
+                part_number: 1,
+                etag: "\"x\"".into(),
+            }],
         })
         .unwrap_err();
     assert_eq!(err.code(), "NoSuchUpload");
@@ -824,16 +862,34 @@ fn complete_rejects_descending_or_duplicate_part_numbers() {
             content_encoding: None,
         })
         .unwrap();
-    let p1 = s.upload_part(UploadPartInput { upload_id: create.upload_id.clone(), part_number: 1, body: b"a".to_vec() }).unwrap();
-    let p2 = s.upload_part(UploadPartInput { upload_id: create.upload_id.clone(), part_number: 2, body: b"b".to_vec() }).unwrap();
+    let p1 = s
+        .upload_part(UploadPartInput {
+            upload_id: create.upload_id.clone(),
+            part_number: 1,
+            body: b"a".to_vec(),
+        })
+        .unwrap();
+    let p2 = s
+        .upload_part(UploadPartInput {
+            upload_id: create.upload_id.clone(),
+            part_number: 2,
+            body: b"b".to_vec(),
+        })
+        .unwrap();
 
     // Descending
     let err = s
         .complete_multipart_upload(CompleteMultipartUploadInput {
             upload_id: create.upload_id.clone(),
             parts: vec![
-                CompletedPart { part_number: 2, etag: p2.etag.clone() },
-                CompletedPart { part_number: 1, etag: p1.etag.clone() },
+                CompletedPart {
+                    part_number: 2,
+                    etag: p2.etag.clone(),
+                },
+                CompletedPart {
+                    part_number: 1,
+                    etag: p1.etag.clone(),
+                },
             ],
         })
         .unwrap_err();
@@ -844,8 +900,14 @@ fn complete_rejects_descending_or_duplicate_part_numbers() {
         .complete_multipart_upload(CompleteMultipartUploadInput {
             upload_id: create.upload_id,
             parts: vec![
-                CompletedPart { part_number: 1, etag: p1.etag.clone() },
-                CompletedPart { part_number: 1, etag: p1.etag },
+                CompletedPart {
+                    part_number: 1,
+                    etag: p1.etag.clone(),
+                },
+                CompletedPart {
+                    part_number: 1,
+                    etag: p1.etag,
+                },
             ],
         })
         .unwrap_err();
@@ -864,12 +926,21 @@ fn complete_rejects_part_with_wrong_etag() {
             content_encoding: None,
         })
         .unwrap();
-    let _ = s.upload_part(UploadPartInput { upload_id: create.upload_id.clone(), part_number: 1, body: b"a".to_vec() }).unwrap();
+    let _ = s
+        .upload_part(UploadPartInput {
+            upload_id: create.upload_id.clone(),
+            part_number: 1,
+            body: b"a".to_vec(),
+        })
+        .unwrap();
 
     let err = s
         .complete_multipart_upload(CompleteMultipartUploadInput {
             upload_id: create.upload_id,
-            parts: vec![CompletedPart { part_number: 1, etag: "\"deadbeef\"".into() }],
+            parts: vec![CompletedPart {
+                part_number: 1,
+                etag: "\"deadbeef\"".into(),
+            }],
         })
         .unwrap_err();
     assert_eq!(err.code(), "InvalidPart");
@@ -887,14 +958,26 @@ fn complete_rejects_part_that_was_never_uploaded() {
             content_encoding: None,
         })
         .unwrap();
-    let p1 = s.upload_part(UploadPartInput { upload_id: create.upload_id.clone(), part_number: 1, body: b"a".to_vec() }).unwrap();
+    let p1 = s
+        .upload_part(UploadPartInput {
+            upload_id: create.upload_id.clone(),
+            part_number: 1,
+            body: b"a".to_vec(),
+        })
+        .unwrap();
 
     let err = s
         .complete_multipart_upload(CompleteMultipartUploadInput {
             upload_id: create.upload_id,
             parts: vec![
-                CompletedPart { part_number: 1, etag: p1.etag },
-                CompletedPart { part_number: 5, etag: "\"x\"".into() },
+                CompletedPart {
+                    part_number: 1,
+                    etag: p1.etag,
+                },
+                CompletedPart {
+                    part_number: 5,
+                    etag: "\"x\"".into(),
+                },
             ],
         })
         .unwrap_err();
@@ -913,12 +996,22 @@ fn abort_removes_upload_state() {
             content_encoding: None,
         })
         .unwrap();
-    s.upload_part(UploadPartInput { upload_id: create.upload_id.clone(), part_number: 1, body: b"x".to_vec() }).unwrap();
-    s.abort_multipart_upload(AbortMultipartUploadInput { upload_id: create.upload_id.clone() }).unwrap();
+    s.upload_part(UploadPartInput {
+        upload_id: create.upload_id.clone(),
+        part_number: 1,
+        body: b"x".to_vec(),
+    })
+    .unwrap();
+    s.abort_multipart_upload(AbortMultipartUploadInput {
+        upload_id: create.upload_id.clone(),
+    })
+    .unwrap();
 
     // Subsequent ListParts on the aborted id should return NoSuchUpload.
     let err = s
-        .list_parts(ListPartsInput { upload_id: create.upload_id })
+        .list_parts(ListPartsInput {
+            upload_id: create.upload_id,
+        })
         .unwrap_err();
     assert_eq!(err.code(), "NoSuchUpload");
 }
@@ -926,7 +1019,10 @@ fn abort_removes_upload_state() {
 #[test]
 fn abort_unknown_upload_is_idempotent() {
     let (_d, s) = mp_store_with_bucket();
-    s.abort_multipart_upload(AbortMultipartUploadInput { upload_id: "ghost".into() }).unwrap();
+    s.abort_multipart_upload(AbortMultipartUploadInput {
+        upload_id: "ghost".into(),
+    })
+    .unwrap();
 }
 
 #[test]
@@ -941,11 +1037,33 @@ fn list_parts_returns_uploaded_parts_in_order() {
             content_encoding: None,
         })
         .unwrap();
-    let p3 = s.upload_part(UploadPartInput { upload_id: create.upload_id.clone(), part_number: 3, body: b"ccc".to_vec() }).unwrap();
-    let p1 = s.upload_part(UploadPartInput { upload_id: create.upload_id.clone(), part_number: 1, body: b"a".to_vec() }).unwrap();
-    let p2 = s.upload_part(UploadPartInput { upload_id: create.upload_id.clone(), part_number: 2, body: b"bb".to_vec() }).unwrap();
+    let p3 = s
+        .upload_part(UploadPartInput {
+            upload_id: create.upload_id.clone(),
+            part_number: 3,
+            body: b"ccc".to_vec(),
+        })
+        .unwrap();
+    let p1 = s
+        .upload_part(UploadPartInput {
+            upload_id: create.upload_id.clone(),
+            part_number: 1,
+            body: b"a".to_vec(),
+        })
+        .unwrap();
+    let p2 = s
+        .upload_part(UploadPartInput {
+            upload_id: create.upload_id.clone(),
+            part_number: 2,
+            body: b"bb".to_vec(),
+        })
+        .unwrap();
 
-    let listed = s.list_parts(ListPartsInput { upload_id: create.upload_id }).unwrap();
+    let listed = s
+        .list_parts(ListPartsInput {
+            upload_id: create.upload_id,
+        })
+        .unwrap();
     assert_eq!(listed.bucket, "bkt");
     assert_eq!(listed.key, "k");
     assert_eq!(listed.parts.len(), 3);
@@ -972,15 +1090,30 @@ fn re_upload_same_part_replaces_body_and_etag() {
             content_encoding: None,
         })
         .unwrap();
-    let p1a = s.upload_part(UploadPartInput { upload_id: create.upload_id.clone(), part_number: 1, body: b"first".to_vec() }).unwrap();
-    let p1b = s.upload_part(UploadPartInput { upload_id: create.upload_id.clone(), part_number: 1, body: b"second-version".to_vec() }).unwrap();
+    let p1a = s
+        .upload_part(UploadPartInput {
+            upload_id: create.upload_id.clone(),
+            part_number: 1,
+            body: b"first".to_vec(),
+        })
+        .unwrap();
+    let p1b = s
+        .upload_part(UploadPartInput {
+            upload_id: create.upload_id.clone(),
+            part_number: 1,
+            body: b"second-version".to_vec(),
+        })
+        .unwrap();
     assert_ne!(p1a.etag, p1b.etag);
 
     // Complete with the new etag — must succeed.
     let complete = s
         .complete_multipart_upload(CompleteMultipartUploadInput {
             upload_id: create.upload_id,
-            parts: vec![CompletedPart { part_number: 1, etag: p1b.etag }],
+            parts: vec![CompletedPart {
+                part_number: 1,
+                etag: p1b.etag,
+            }],
         })
         .unwrap();
     let got = s

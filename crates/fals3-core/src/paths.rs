@@ -101,10 +101,7 @@ pub fn object_path(base_dir: &Path, bucket: &str, key: &str) -> PathBuf {
 /// Returns `{base_dir}/{bucket}/{key}.fals3-meta.json`.
 pub fn meta_path(base_dir: &Path, bucket: &str, key: &str) -> PathBuf {
     let body = object_path(base_dir, bucket, key);
-    let mut name = body
-        .file_name()
-        .unwrap_or_default()
-        .to_os_string();
+    let mut name = body.file_name().unwrap_or_default().to_os_string();
     name.push(".fals3-meta.json");
     body.with_file_name(name)
 }
@@ -137,7 +134,13 @@ mod tests {
 
     #[test]
     fn valid_bucket_names() {
-        for name in &["abc", "my-bucket", "test123", "a-b-c", "x".repeat(63).as_str()] {
+        for name in &[
+            "abc",
+            "my-bucket",
+            "test123",
+            "a-b-c",
+            "x".repeat(63).as_str(),
+        ] {
             validate_bucket_name(name).unwrap_or_else(|e| panic!("{name}: {e}"));
         }
     }
@@ -214,7 +217,10 @@ mod tests {
     #[test]
     fn bucket_path_correct() {
         let base = Path::new("/tmp/s3");
-        assert_eq!(bucket_path(base, "my-bucket"), PathBuf::from("/tmp/s3/my-bucket"));
+        assert_eq!(
+            bucket_path(base, "my-bucket"),
+            PathBuf::from("/tmp/s3/my-bucket")
+        );
     }
 
     #[test]

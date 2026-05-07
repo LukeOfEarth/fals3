@@ -15,8 +15,7 @@ use crate::{
     error::{Fals3Error, Result},
     meta::{compute_md5_bytes, compute_multipart_etag, ObjectMeta},
     paths::{
-        assert_within_base, bucket_path, meta_path, object_path, validate_bucket_name,
-        validate_key,
+        assert_within_base, bucket_path, meta_path, object_path, validate_bucket_name, validate_key,
     },
 };
 
@@ -156,7 +155,9 @@ fn check_write_preconditions(existing: Option<&ObjectMeta>, c: &IfConditions) ->
     if let Some(ref im) = c.if_match {
         match existing {
             None => return Err(Fals3Error::PreconditionFailed),
-            Some(meta) if !etag_matches(im, &meta.etag) => return Err(Fals3Error::PreconditionFailed),
+            Some(meta) if !etag_matches(im, &meta.etag) => {
+                return Err(Fals3Error::PreconditionFailed)
+            }
             Some(_) => {}
         }
     }
@@ -641,7 +642,9 @@ impl Store {
         let total_returned = contents.len() + common_prefix_set.len();
         let is_truncated = total_returned >= max_keys && {
             // Check whether there are more keys beyond what we returned.
-            let last_key = contents.last().map(|e| e.key.as_str())
+            let last_key = contents
+                .last()
+                .map(|e| e.key.as_str())
                 .or_else(|| common_prefix_set.iter().last().map(String::as_str));
             if let Some(lk) = last_key {
                 keys.iter().any(|k| k.as_str() > lk)
@@ -651,7 +654,9 @@ impl Store {
         };
 
         let next_continuation_token = if is_truncated {
-            let last_key = contents.last().map(|e| e.key.clone())
+            let last_key = contents
+                .last()
+                .map(|e| e.key.clone())
                 .or_else(|| common_prefix_set.iter().last().cloned());
             last_key.map(|k| Self::encode_token(&k))
         } else {
@@ -720,9 +725,10 @@ impl Store {
             }
 
             let meta = match input.metadata_directive {
-                Some(MetadataDirective::Replace { content_type, metadata }) => {
-                    ObjectMeta::new(&body, content_type, metadata, None)
-                }
+                Some(MetadataDirective::Replace {
+                    content_type,
+                    metadata,
+                }) => ObjectMeta::new(&body, content_type, metadata, None),
                 None => ObjectMeta::new(
                     &body,
                     src_meta.content_type,
@@ -974,6 +980,12 @@ impl Store {
         dir: &Path,
         keys: &mut Vec<String>,
     ) -> Result<()> {
+        // `&self` isn't strictly needed (this is a tree walk over `dir`), but
+        // keeping the method shape lets us reuse `self.base_dir` etc. in the
+        // future without touching call sites.  Suppress the "parameter only
+        // used in recursion" lint.
+        #[allow(clippy::only_used_in_recursion)]
+        let _ = self;
         for entry in std::fs::read_dir(dir)? {
             let entry = entry?;
             let ft = entry.file_type()?;
@@ -1011,9 +1023,7 @@ impl Store {
     fn decode_token(token: &str) -> String {
         (0..token.len())
             .step_by(2)
-            .filter_map(|i| {
-                u8::from_str_radix(&token[i..i + 2], 16).ok()
-            })
+            .filter_map(|i| u8::from_str_radix(&token[i..i + 2], 16).ok())
             .map(|b| b as char)
             .collect()
     }
@@ -1074,11 +1084,11 @@ fn upload_meta_path(dir: &Path) -> PathBuf {
 }
 
 fn part_body_path(dir: &Path, part_number: u32) -> PathBuf {
-    dir.join(format!("part-{:05}.bin", part_number))
+    dir.join(format!("part-{part_number:05}.bin"))
 }
 
 fn part_etag_path(dir: &Path, part_number: u32) -> PathBuf {
-    dir.join(format!("part-{:05}.etag", part_number))
+    dir.join(format!("part-{part_number:05}.etag"))
 }
 
 fn parse_part_body_filename(name: &str) -> Option<u32> {
@@ -1121,7 +1131,7 @@ fn new_upload_id() -> String {
         .unwrap_or_default()
         .as_nanos() as u64;
     let n = COUNTER.fetch_add(1, Ordering::Relaxed);
-    format!("{:016x}{:016x}", t, n)
+    format!("{t:016x}{n:016x}")
 }
 
 #[cfg(test)]
@@ -1139,29 +1149,53 @@ mod tests {
     #[test]
     fn create_and_head_bucket() {
         let (_dir, store) = tmp_store();
-        store.create_bucket(CreateBucketInput { bucket: "my-bucket".into() }).unwrap();
-        store.head_bucket(HeadBucketInput { bucket: "my-bucket".into() }).unwrap();
+        store
+            .create_bucket(CreateBucketInput {
+                bucket: "my-bucket".into(),
+            })
+            .unwrap();
+        store
+            .head_bucket(HeadBucketInput {
+                bucket: "my-bucket".into(),
+            })
+            .unwrap();
     }
 
     #[test]
     fn create_bucket_already_exists() {
         let (_dir, store) = tmp_store();
-        store.create_bucket(CreateBucketInput { bucket: "dup".into() }).unwrap();
-        let err = store.create_bucket(CreateBucketInput { bucket: "dup".into() }).unwrap_err();
+        store
+            .create_bucket(CreateBucketInput {
+                bucket: "dup".into(),
+            })
+            .unwrap();
+        let err = store
+            .create_bucket(CreateBucketInput {
+                bucket: "dup".into(),
+            })
+            .unwrap_err();
         assert_eq!(err.code(), "BucketAlreadyExists");
     }
 
     #[test]
     fn create_bucket_invalid_name() {
         let (_dir, store) = tmp_store();
-        let err = store.create_bucket(CreateBucketInput { bucket: "BadName".into() }).unwrap_err();
+        let err = store
+            .create_bucket(CreateBucketInput {
+                bucket: "BadName".into(),
+            })
+            .unwrap_err();
         assert_eq!(err.code(), "InvalidBucketName");
     }
 
     #[test]
     fn head_bucket_missing() {
         let (_dir, store) = tmp_store();
-        let err = store.head_bucket(HeadBucketInput { bucket: "missing".into() }).unwrap_err();
+        let err = store
+            .head_bucket(HeadBucketInput {
+                bucket: "missing".into(),
+            })
+            .unwrap_err();
         assert_eq!(err.code(), "NoSuchBucket");
     }
 
@@ -1170,27 +1204,49 @@ mod tests {
     #[test]
     fn delete_empty_bucket() {
         let (_dir, store) = tmp_store();
-        store.create_bucket(CreateBucketInput { bucket: "todel".into() }).unwrap();
-        store.delete_bucket(DeleteBucketInput { bucket: "todel".into(), force: false }).unwrap();
-        let err = store.head_bucket(HeadBucketInput { bucket: "todel".into() }).unwrap_err();
+        store
+            .create_bucket(CreateBucketInput {
+                bucket: "todel".into(),
+            })
+            .unwrap();
+        store
+            .delete_bucket(DeleteBucketInput {
+                bucket: "todel".into(),
+                force: false,
+            })
+            .unwrap();
+        let err = store
+            .head_bucket(HeadBucketInput {
+                bucket: "todel".into(),
+            })
+            .unwrap_err();
         assert_eq!(err.code(), "NoSuchBucket");
     }
 
     #[test]
     fn delete_nonempty_bucket_without_force_errors() {
         let (_dir, store) = tmp_store();
-        store.create_bucket(CreateBucketInput { bucket: "full".into() }).unwrap();
-        store.put_object(PutObjectInput {
-            bucket: "full".into(),
-            key: "obj.txt".into(),
-            body: b"data".to_vec(),
-            content_type: None,
-            metadata: HashMap::new(),
-            content_encoding: None,
-            conditions: IfConditions::default(),
-        }).unwrap();
+        store
+            .create_bucket(CreateBucketInput {
+                bucket: "full".into(),
+            })
+            .unwrap();
+        store
+            .put_object(PutObjectInput {
+                bucket: "full".into(),
+                key: "obj.txt".into(),
+                body: b"data".to_vec(),
+                content_type: None,
+                metadata: HashMap::new(),
+                content_encoding: None,
+                conditions: IfConditions::default(),
+            })
+            .unwrap();
         let err = store
-            .delete_bucket(DeleteBucketInput { bucket: "full".into(), force: false })
+            .delete_bucket(DeleteBucketInput {
+                bucket: "full".into(),
+                force: false,
+            })
             .unwrap_err();
         assert_eq!(err.code(), "BucketNotEmpty");
     }
@@ -1198,24 +1254,38 @@ mod tests {
     #[test]
     fn delete_nonempty_bucket_with_force() {
         let (_dir, store) = tmp_store();
-        store.create_bucket(CreateBucketInput { bucket: "full".into() }).unwrap();
-        store.put_object(PutObjectInput {
-            bucket: "full".into(),
-            key: "obj.txt".into(),
-            body: b"data".to_vec(),
-            content_type: None,
-            metadata: HashMap::new(),
-            content_encoding: None,
-            conditions: IfConditions::default(),
-        }).unwrap();
-        store.delete_bucket(DeleteBucketInput { bucket: "full".into(), force: true }).unwrap();
+        store
+            .create_bucket(CreateBucketInput {
+                bucket: "full".into(),
+            })
+            .unwrap();
+        store
+            .put_object(PutObjectInput {
+                bucket: "full".into(),
+                key: "obj.txt".into(),
+                body: b"data".to_vec(),
+                content_type: None,
+                metadata: HashMap::new(),
+                content_encoding: None,
+                conditions: IfConditions::default(),
+            })
+            .unwrap();
+        store
+            .delete_bucket(DeleteBucketInput {
+                bucket: "full".into(),
+                force: true,
+            })
+            .unwrap();
     }
 
     #[test]
     fn delete_missing_bucket() {
         let (_dir, store) = tmp_store();
         let err = store
-            .delete_bucket(DeleteBucketInput { bucket: "ghost".into(), force: false })
+            .delete_bucket(DeleteBucketInput {
+                bucket: "ghost".into(),
+                force: false,
+            })
             .unwrap_err();
         assert_eq!(err.code(), "NoSuchBucket");
     }
@@ -1225,107 +1295,152 @@ mod tests {
     #[test]
     fn put_get_roundtrip() {
         let (_dir, store) = tmp_store();
-        store.create_bucket(CreateBucketInput { bucket: "bkt".into() }).unwrap();
+        store
+            .create_bucket(CreateBucketInput {
+                bucket: "bkt".into(),
+            })
+            .unwrap();
 
-        let out = store.put_object(PutObjectInput {
-            bucket: "bkt".into(),
-            key: "hello.txt".into(),
-            body: b"hello world".to_vec(),
-            content_type: Some("text/plain".into()),
-            metadata: HashMap::from([("author".into(), "test".into())]),
-            content_encoding: None,
-            conditions: IfConditions::default(),
-        }).unwrap();
+        let out = store
+            .put_object(PutObjectInput {
+                bucket: "bkt".into(),
+                key: "hello.txt".into(),
+                body: b"hello world".to_vec(),
+                content_type: Some("text/plain".into()),
+                metadata: HashMap::from([("author".into(), "test".into())]),
+                content_encoding: None,
+                conditions: IfConditions::default(),
+            })
+            .unwrap();
 
         assert!(out.etag.starts_with('"'));
 
-        let got = store.get_object(GetObjectInput {
-            bucket: "bkt".into(),
-            key: "hello.txt".into(),
-            range: None,
-            conditions: IfConditions::default(),
-        }).unwrap();
+        let got = store
+            .get_object(GetObjectInput {
+                bucket: "bkt".into(),
+                key: "hello.txt".into(),
+                range: None,
+                conditions: IfConditions::default(),
+            })
+            .unwrap();
 
         assert_eq!(got.body, b"hello world");
         assert_eq!(got.meta.etag, out.etag);
         assert_eq!(got.meta.content_type, Some("text/plain".into()));
-        assert_eq!(got.meta.user_metadata.get("author").map(String::as_str), Some("test"));
+        assert_eq!(
+            got.meta.user_metadata.get("author").map(String::as_str),
+            Some("test")
+        );
     }
 
     #[test]
     fn put_nested_key() {
         let (_dir, store) = tmp_store();
-        store.create_bucket(CreateBucketInput { bucket: "bkt".into() }).unwrap();
-        store.put_object(PutObjectInput {
-            bucket: "bkt".into(),
-            key: "users/1/avatar.png".into(),
-            body: b"\x89PNG".to_vec(),
-            content_type: Some("image/png".into()),
-            metadata: HashMap::new(),
-            content_encoding: None,
-            conditions: IfConditions::default(),
-        }).unwrap();
+        store
+            .create_bucket(CreateBucketInput {
+                bucket: "bkt".into(),
+            })
+            .unwrap();
+        store
+            .put_object(PutObjectInput {
+                bucket: "bkt".into(),
+                key: "users/1/avatar.png".into(),
+                body: b"\x89PNG".to_vec(),
+                content_type: Some("image/png".into()),
+                metadata: HashMap::new(),
+                content_encoding: None,
+                conditions: IfConditions::default(),
+            })
+            .unwrap();
 
-        let got = store.get_object(GetObjectInput {
-            bucket: "bkt".into(),
-            key: "users/1/avatar.png".into(),
-            range: None,
-            conditions: IfConditions::default(),
-        }).unwrap();
+        let got = store
+            .get_object(GetObjectInput {
+                bucket: "bkt".into(),
+                key: "users/1/avatar.png".into(),
+                range: None,
+                conditions: IfConditions::default(),
+            })
+            .unwrap();
         assert_eq!(&got.body[..4], b"\x89PNG");
     }
 
     #[test]
     fn get_range() {
         let (_dir, store) = tmp_store();
-        store.create_bucket(CreateBucketInput { bucket: "bkt".into() }).unwrap();
-        store.put_object(PutObjectInput {
-            bucket: "bkt".into(),
-            key: "data.bin".into(),
-            body: b"0123456789".to_vec(),
-            content_type: None,
-            metadata: HashMap::new(),
-            content_encoding: None,
-            conditions: IfConditions::default(),
-        }).unwrap();
+        store
+            .create_bucket(CreateBucketInput {
+                bucket: "bkt".into(),
+            })
+            .unwrap();
+        store
+            .put_object(PutObjectInput {
+                bucket: "bkt".into(),
+                key: "data.bin".into(),
+                body: b"0123456789".to_vec(),
+                content_type: None,
+                metadata: HashMap::new(),
+                content_encoding: None,
+                conditions: IfConditions::default(),
+            })
+            .unwrap();
 
-        let got = store.get_object(GetObjectInput {
-            bucket: "bkt".into(),
-            key: "data.bin".into(),
-            range: Some((2, 5)),
-            conditions: IfConditions::default(),
-        }).unwrap();
+        let got = store
+            .get_object(GetObjectInput {
+                bucket: "bkt".into(),
+                key: "data.bin".into(),
+                range: Some((2, 5)),
+                conditions: IfConditions::default(),
+            })
+            .unwrap();
         assert_eq!(got.body, b"2345");
     }
 
     #[test]
     fn get_missing_key() {
         let (_dir, store) = tmp_store();
-        store.create_bucket(CreateBucketInput { bucket: "bkt".into() }).unwrap();
-        let err = store.get_object(GetObjectInput {
-            bucket: "bkt".into(),
-            key: "ghost.txt".into(),
-            range: None,
-            conditions: IfConditions::default(),
-        }).unwrap_err();
+        store
+            .create_bucket(CreateBucketInput {
+                bucket: "bkt".into(),
+            })
+            .unwrap();
+        let err = store
+            .get_object(GetObjectInput {
+                bucket: "bkt".into(),
+                key: "ghost.txt".into(),
+                range: None,
+                conditions: IfConditions::default(),
+            })
+            .unwrap_err();
         assert_eq!(err.code(), "NoSuchKey");
     }
 
     #[test]
     fn head_object() {
         let (_dir, store) = tmp_store();
-        store.create_bucket(CreateBucketInput { bucket: "bkt".into() }).unwrap();
-        store.put_object(PutObjectInput {
-            bucket: "bkt".into(),
-            key: "f.txt".into(),
-            body: b"hi".to_vec(),
-            content_type: None,
-            metadata: HashMap::new(),
-            content_encoding: None,
-            conditions: IfConditions::default(),
-        }).unwrap();
+        store
+            .create_bucket(CreateBucketInput {
+                bucket: "bkt".into(),
+            })
+            .unwrap();
+        store
+            .put_object(PutObjectInput {
+                bucket: "bkt".into(),
+                key: "f.txt".into(),
+                body: b"hi".to_vec(),
+                content_type: None,
+                metadata: HashMap::new(),
+                content_encoding: None,
+                conditions: IfConditions::default(),
+            })
+            .unwrap();
 
-        let meta = store.head_object(HeadObjectInput { bucket: "bkt".into(), key: "f.txt".into(), conditions: IfConditions::default() }).unwrap();
+        let meta = store
+            .head_object(HeadObjectInput {
+                bucket: "bkt".into(),
+                key: "f.txt".into(),
+                conditions: IfConditions::default(),
+            })
+            .unwrap();
         assert_eq!(meta.size, 2);
     }
 
@@ -1334,79 +1449,111 @@ mod tests {
     #[test]
     fn delete_object_idempotent() {
         let (_dir, store) = tmp_store();
-        store.create_bucket(CreateBucketInput { bucket: "bkt".into() }).unwrap();
+        store
+            .create_bucket(CreateBucketInput {
+                bucket: "bkt".into(),
+            })
+            .unwrap();
         // Delete a key that was never created — should succeed (idempotent).
-        store.delete_object(DeleteObjectInput { bucket: "bkt".into(), key: "ghost.txt".into() }).unwrap();
+        store
+            .delete_object(DeleteObjectInput {
+                bucket: "bkt".into(),
+                key: "ghost.txt".into(),
+            })
+            .unwrap();
     }
 
     #[test]
     fn delete_object_then_get_returns_no_such_key() {
         let (_dir, store) = tmp_store();
-        store.create_bucket(CreateBucketInput { bucket: "bkt".into() }).unwrap();
-        store.put_object(PutObjectInput {
-            bucket: "bkt".into(),
-            key: "bye.txt".into(),
-            body: b"bye".to_vec(),
-            content_type: None,
-            metadata: HashMap::new(),
-            content_encoding: None,
-            conditions: IfConditions::default(),
-        }).unwrap();
-        store.delete_object(DeleteObjectInput { bucket: "bkt".into(), key: "bye.txt".into() }).unwrap();
+        store
+            .create_bucket(CreateBucketInput {
+                bucket: "bkt".into(),
+            })
+            .unwrap();
+        store
+            .put_object(PutObjectInput {
+                bucket: "bkt".into(),
+                key: "bye.txt".into(),
+                body: b"bye".to_vec(),
+                content_type: None,
+                metadata: HashMap::new(),
+                content_encoding: None,
+                conditions: IfConditions::default(),
+            })
+            .unwrap();
+        store
+            .delete_object(DeleteObjectInput {
+                bucket: "bkt".into(),
+                key: "bye.txt".into(),
+            })
+            .unwrap();
 
-        let err = store.get_object(GetObjectInput {
-            bucket: "bkt".into(),
-            key: "bye.txt".into(),
-            range: None,
-            conditions: IfConditions::default(),
-        }).unwrap_err();
+        let err = store
+            .get_object(GetObjectInput {
+                bucket: "bkt".into(),
+                key: "bye.txt".into(),
+                range: None,
+                conditions: IfConditions::default(),
+            })
+            .unwrap_err();
         assert_eq!(err.code(), "NoSuchKey");
     }
 
     #[test]
     fn put_on_missing_bucket_errors() {
         let (_dir, store) = tmp_store();
-        let err = store.put_object(PutObjectInput {
-            bucket: "no-such".into(),
-            key: "f.txt".into(),
-            body: vec![],
-            content_type: None,
-            metadata: HashMap::new(),
-            content_encoding: None,
-            conditions: IfConditions::default(),
-        }).unwrap_err();
+        let err = store
+            .put_object(PutObjectInput {
+                bucket: "no-such".into(),
+                key: "f.txt".into(),
+                body: vec![],
+                content_type: None,
+                metadata: HashMap::new(),
+                content_encoding: None,
+                conditions: IfConditions::default(),
+            })
+            .unwrap_err();
         assert_eq!(err.code(), "NoSuchBucket");
     }
 
     // ── ListObjectsV2 ─────────────────────────────────────────────────────
 
     fn put(store: &Store, bucket: &str, key: &str, body: &[u8]) {
-        store.put_object(PutObjectInput {
-            bucket: bucket.into(),
-            key: key.into(),
-            body: body.to_vec(),
-            content_type: None,
-            metadata: HashMap::new(),
-            content_encoding: None,
-            conditions: IfConditions::default(),
-        }).unwrap();
+        store
+            .put_object(PutObjectInput {
+                bucket: bucket.into(),
+                key: key.into(),
+                body: body.to_vec(),
+                content_type: None,
+                metadata: HashMap::new(),
+                content_encoding: None,
+                conditions: IfConditions::default(),
+            })
+            .unwrap();
     }
 
     #[test]
     fn list_all_keys() {
         let (_dir, store) = tmp_store();
-        store.create_bucket(CreateBucketInput { bucket: "bkt".into() }).unwrap();
+        store
+            .create_bucket(CreateBucketInput {
+                bucket: "bkt".into(),
+            })
+            .unwrap();
         put(&store, "bkt", "a.txt", b"a");
         put(&store, "bkt", "b.txt", b"b");
         put(&store, "bkt", "c.txt", b"c");
 
-        let out = store.list_objects_v2(ListObjectsV2Input {
-            bucket: "bkt".into(),
-            prefix: None,
-            delimiter: None,
-            max_keys: None,
-            continuation_token: None,
-        }).unwrap();
+        let out = store
+            .list_objects_v2(ListObjectsV2Input {
+                bucket: "bkt".into(),
+                prefix: None,
+                delimiter: None,
+                max_keys: None,
+                continuation_token: None,
+            })
+            .unwrap();
 
         assert_eq!(out.key_count, 3);
         assert!(!out.is_truncated);
@@ -1417,18 +1564,24 @@ mod tests {
     #[test]
     fn list_with_prefix() {
         let (_dir, store) = tmp_store();
-        store.create_bucket(CreateBucketInput { bucket: "bkt".into() }).unwrap();
+        store
+            .create_bucket(CreateBucketInput {
+                bucket: "bkt".into(),
+            })
+            .unwrap();
         put(&store, "bkt", "imgs/a.png", b"a");
         put(&store, "bkt", "imgs/b.png", b"b");
         put(&store, "bkt", "docs/c.txt", b"c");
 
-        let out = store.list_objects_v2(ListObjectsV2Input {
-            bucket: "bkt".into(),
-            prefix: Some("imgs/".into()),
-            delimiter: None,
-            max_keys: None,
-            continuation_token: None,
-        }).unwrap();
+        let out = store
+            .list_objects_v2(ListObjectsV2Input {
+                bucket: "bkt".into(),
+                prefix: Some("imgs/".into()),
+                delimiter: None,
+                max_keys: None,
+                continuation_token: None,
+            })
+            .unwrap();
 
         assert_eq!(out.key_count, 2);
         let keys: Vec<&str> = out.contents.iter().map(|e| e.key.as_str()).collect();
@@ -1438,19 +1591,25 @@ mod tests {
     #[test]
     fn list_with_delimiter_common_prefixes() {
         let (_dir, store) = tmp_store();
-        store.create_bucket(CreateBucketInput { bucket: "bkt".into() }).unwrap();
+        store
+            .create_bucket(CreateBucketInput {
+                bucket: "bkt".into(),
+            })
+            .unwrap();
         put(&store, "bkt", "a/x.txt", b"x");
         put(&store, "bkt", "a/y.txt", b"y");
         put(&store, "bkt", "b/z.txt", b"z");
         put(&store, "bkt", "root.txt", b"r");
 
-        let out = store.list_objects_v2(ListObjectsV2Input {
-            bucket: "bkt".into(),
-            prefix: None,
-            delimiter: Some("/".into()),
-            max_keys: None,
-            continuation_token: None,
-        }).unwrap();
+        let out = store
+            .list_objects_v2(ListObjectsV2Input {
+                bucket: "bkt".into(),
+                prefix: None,
+                delimiter: Some("/".into()),
+                max_keys: None,
+                continuation_token: None,
+            })
+            .unwrap();
 
         assert!(out.common_prefixes.contains(&"a/".to_string()));
         assert!(out.common_prefixes.contains(&"b/".to_string()));
@@ -1461,43 +1620,55 @@ mod tests {
     #[test]
     fn list_pagination() {
         let (_dir, store) = tmp_store();
-        store.create_bucket(CreateBucketInput { bucket: "bkt".into() }).unwrap();
+        store
+            .create_bucket(CreateBucketInput {
+                bucket: "bkt".into(),
+            })
+            .unwrap();
         for i in 0..5u8 {
             put(&store, "bkt", &format!("obj{i}.txt"), &[i]);
         }
 
-        let page1 = store.list_objects_v2(ListObjectsV2Input {
-            bucket: "bkt".into(),
-            prefix: None,
-            delimiter: None,
-            max_keys: Some(2),
-            continuation_token: None,
-        }).unwrap();
+        let page1 = store
+            .list_objects_v2(ListObjectsV2Input {
+                bucket: "bkt".into(),
+                prefix: None,
+                delimiter: None,
+                max_keys: Some(2),
+                continuation_token: None,
+            })
+            .unwrap();
         assert_eq!(page1.contents.len(), 2);
         assert!(page1.is_truncated);
         assert!(page1.next_continuation_token.is_some());
 
-        let page2 = store.list_objects_v2(ListObjectsV2Input {
-            bucket: "bkt".into(),
-            prefix: None,
-            delimiter: None,
-            max_keys: Some(2),
-            continuation_token: page1.next_continuation_token.clone(),
-        }).unwrap();
+        let page2 = store
+            .list_objects_v2(ListObjectsV2Input {
+                bucket: "bkt".into(),
+                prefix: None,
+                delimiter: None,
+                max_keys: Some(2),
+                continuation_token: page1.next_continuation_token.clone(),
+            })
+            .unwrap();
         assert_eq!(page2.contents.len(), 2);
 
-        let page3 = store.list_objects_v2(ListObjectsV2Input {
-            bucket: "bkt".into(),
-            prefix: None,
-            delimiter: None,
-            max_keys: Some(2),
-            continuation_token: page2.next_continuation_token.clone(),
-        }).unwrap();
+        let page3 = store
+            .list_objects_v2(ListObjectsV2Input {
+                bucket: "bkt".into(),
+                prefix: None,
+                delimiter: None,
+                max_keys: Some(2),
+                continuation_token: page2.next_continuation_token.clone(),
+            })
+            .unwrap();
         assert_eq!(page3.contents.len(), 1);
         assert!(!page3.is_truncated);
 
         // Ensure pages are non-overlapping and cover all 5 keys.
-        let mut all: Vec<String> = page1.contents.iter()
+        let mut all: Vec<String> = page1
+            .contents
+            .iter()
             .chain(page2.contents.iter())
             .chain(page3.contents.iter())
             .map(|e| e.key.clone())
@@ -1510,14 +1681,20 @@ mod tests {
     #[test]
     fn list_empty_bucket() {
         let (_dir, store) = tmp_store();
-        store.create_bucket(CreateBucketInput { bucket: "empty".into() }).unwrap();
-        let out = store.list_objects_v2(ListObjectsV2Input {
-            bucket: "empty".into(),
-            prefix: None,
-            delimiter: None,
-            max_keys: None,
-            continuation_token: None,
-        }).unwrap();
+        store
+            .create_bucket(CreateBucketInput {
+                bucket: "empty".into(),
+            })
+            .unwrap();
+        let out = store
+            .list_objects_v2(ListObjectsV2Input {
+                bucket: "empty".into(),
+                prefix: None,
+                delimiter: None,
+                max_keys: None,
+                continuation_token: None,
+            })
+            .unwrap();
         assert_eq!(out.key_count, 0);
         assert!(!out.is_truncated);
     }
@@ -1527,124 +1704,184 @@ mod tests {
     #[test]
     fn copy_same_bucket() {
         let (_dir, store) = tmp_store();
-        store.create_bucket(CreateBucketInput { bucket: "bkt".into() }).unwrap();
+        store
+            .create_bucket(CreateBucketInput {
+                bucket: "bkt".into(),
+            })
+            .unwrap();
         put(&store, "bkt", "src.txt", b"hello");
 
-        let out = store.copy_object(CopyObjectInput {
-            src_bucket: "bkt".into(),
-            src_key: "src.txt".into(),
-            dst_bucket: "bkt".into(),
-            dst_key: "dst.txt".into(),
-            metadata_directive: None,
-            source_conditions: IfConditions::default(),
-        }).unwrap();
+        let out = store
+            .copy_object(CopyObjectInput {
+                src_bucket: "bkt".into(),
+                src_key: "src.txt".into(),
+                dst_bucket: "bkt".into(),
+                dst_key: "dst.txt".into(),
+                metadata_directive: None,
+                source_conditions: IfConditions::default(),
+            })
+            .unwrap();
         assert!(!out.etag.is_empty());
 
-        let got = store.get_object(GetObjectInput {
-            bucket: "bkt".into(),
-            key: "dst.txt".into(),
-            range: None,
-            conditions: IfConditions::default(),
-        }).unwrap();
+        let got = store
+            .get_object(GetObjectInput {
+                bucket: "bkt".into(),
+                key: "dst.txt".into(),
+                range: None,
+                conditions: IfConditions::default(),
+            })
+            .unwrap();
         assert_eq!(got.body, b"hello");
     }
 
     #[test]
     fn copy_cross_bucket() {
         let (_dir, store) = tmp_store();
-        store.create_bucket(CreateBucketInput { bucket: "src-bkt".into() }).unwrap();
-        store.create_bucket(CreateBucketInput { bucket: "dst-bkt".into() }).unwrap();
+        store
+            .create_bucket(CreateBucketInput {
+                bucket: "src-bkt".into(),
+            })
+            .unwrap();
+        store
+            .create_bucket(CreateBucketInput {
+                bucket: "dst-bkt".into(),
+            })
+            .unwrap();
         put(&store, "src-bkt", "file.txt", b"data");
 
-        store.copy_object(CopyObjectInput {
-            src_bucket: "src-bkt".into(),
-            src_key: "file.txt".into(),
-            dst_bucket: "dst-bkt".into(),
-            dst_key: "copy.txt".into(),
-            metadata_directive: None,
-            source_conditions: IfConditions::default(),
-        }).unwrap();
+        store
+            .copy_object(CopyObjectInput {
+                src_bucket: "src-bkt".into(),
+                src_key: "file.txt".into(),
+                dst_bucket: "dst-bkt".into(),
+                dst_key: "copy.txt".into(),
+                metadata_directive: None,
+                source_conditions: IfConditions::default(),
+            })
+            .unwrap();
 
-        let got = store.get_object(GetObjectInput {
-            bucket: "dst-bkt".into(),
-            key: "copy.txt".into(),
-            range: None,
-            conditions: IfConditions::default(),
-        }).unwrap();
+        let got = store
+            .get_object(GetObjectInput {
+                bucket: "dst-bkt".into(),
+                key: "copy.txt".into(),
+                range: None,
+                conditions: IfConditions::default(),
+            })
+            .unwrap();
         assert_eq!(got.body, b"data");
     }
 
     #[test]
     fn copy_preserves_metadata_by_default() {
         let (_dir, store) = tmp_store();
-        store.create_bucket(CreateBucketInput { bucket: "bkt".into() }).unwrap();
-        store.put_object(PutObjectInput {
-            bucket: "bkt".into(),
-            key: "src.txt".into(),
-            body: b"hi".to_vec(),
-            content_type: Some("text/plain".into()),
-            metadata: HashMap::from([("owner".into(), "alice".into())]),
-            content_encoding: None,
-            conditions: IfConditions::default(),
-        }).unwrap();
+        store
+            .create_bucket(CreateBucketInput {
+                bucket: "bkt".into(),
+            })
+            .unwrap();
+        store
+            .put_object(PutObjectInput {
+                bucket: "bkt".into(),
+                key: "src.txt".into(),
+                body: b"hi".to_vec(),
+                content_type: Some("text/plain".into()),
+                metadata: HashMap::from([("owner".into(), "alice".into())]),
+                content_encoding: None,
+                conditions: IfConditions::default(),
+            })
+            .unwrap();
 
-        store.copy_object(CopyObjectInput {
-            src_bucket: "bkt".into(),
-            src_key: "src.txt".into(),
-            dst_bucket: "bkt".into(),
-            dst_key: "dst.txt".into(),
-            metadata_directive: None,
-            source_conditions: IfConditions::default(),
-        }).unwrap();
+        store
+            .copy_object(CopyObjectInput {
+                src_bucket: "bkt".into(),
+                src_key: "src.txt".into(),
+                dst_bucket: "bkt".into(),
+                dst_key: "dst.txt".into(),
+                metadata_directive: None,
+                source_conditions: IfConditions::default(),
+            })
+            .unwrap();
 
-        let meta = store.head_object(HeadObjectInput { bucket: "bkt".into(), key: "dst.txt".into(), conditions: IfConditions::default() }).unwrap();
+        let meta = store
+            .head_object(HeadObjectInput {
+                bucket: "bkt".into(),
+                key: "dst.txt".into(),
+                conditions: IfConditions::default(),
+            })
+            .unwrap();
         assert_eq!(meta.content_type, Some("text/plain".into()));
-        assert_eq!(meta.user_metadata.get("owner").map(String::as_str), Some("alice"));
+        assert_eq!(
+            meta.user_metadata.get("owner").map(String::as_str),
+            Some("alice")
+        );
     }
 
     #[test]
     fn copy_replace_metadata() {
         let (_dir, store) = tmp_store();
-        store.create_bucket(CreateBucketInput { bucket: "bkt".into() }).unwrap();
-        store.put_object(PutObjectInput {
-            bucket: "bkt".into(),
-            key: "src.txt".into(),
-            body: b"hi".to_vec(),
-            content_type: Some("text/plain".into()),
-            metadata: HashMap::from([("owner".into(), "alice".into())]),
-            content_encoding: None,
-            conditions: IfConditions::default(),
-        }).unwrap();
+        store
+            .create_bucket(CreateBucketInput {
+                bucket: "bkt".into(),
+            })
+            .unwrap();
+        store
+            .put_object(PutObjectInput {
+                bucket: "bkt".into(),
+                key: "src.txt".into(),
+                body: b"hi".to_vec(),
+                content_type: Some("text/plain".into()),
+                metadata: HashMap::from([("owner".into(), "alice".into())]),
+                content_encoding: None,
+                conditions: IfConditions::default(),
+            })
+            .unwrap();
 
-        store.copy_object(CopyObjectInput {
-            src_bucket: "bkt".into(),
-            src_key: "src.txt".into(),
-            dst_bucket: "bkt".into(),
-            dst_key: "dst.txt".into(),
-            metadata_directive: Some(MetadataDirective::Replace {
-                content_type: Some("application/octet-stream".into()),
-                metadata: HashMap::from([("owner".into(), "bob".into())]),
-            }),
-            source_conditions: IfConditions::default(),
-        }).unwrap();
+        store
+            .copy_object(CopyObjectInput {
+                src_bucket: "bkt".into(),
+                src_key: "src.txt".into(),
+                dst_bucket: "bkt".into(),
+                dst_key: "dst.txt".into(),
+                metadata_directive: Some(MetadataDirective::Replace {
+                    content_type: Some("application/octet-stream".into()),
+                    metadata: HashMap::from([("owner".into(), "bob".into())]),
+                }),
+                source_conditions: IfConditions::default(),
+            })
+            .unwrap();
 
-        let meta = store.head_object(HeadObjectInput { bucket: "bkt".into(), key: "dst.txt".into(), conditions: IfConditions::default() }).unwrap();
+        let meta = store
+            .head_object(HeadObjectInput {
+                bucket: "bkt".into(),
+                key: "dst.txt".into(),
+                conditions: IfConditions::default(),
+            })
+            .unwrap();
         assert_eq!(meta.content_type, Some("application/octet-stream".into()));
-        assert_eq!(meta.user_metadata.get("owner").map(String::as_str), Some("bob"));
+        assert_eq!(
+            meta.user_metadata.get("owner").map(String::as_str),
+            Some("bob")
+        );
     }
 
     #[test]
     fn copy_missing_source_key() {
         let (_dir, store) = tmp_store();
-        store.create_bucket(CreateBucketInput { bucket: "bkt".into() }).unwrap();
-        let err = store.copy_object(CopyObjectInput {
-            src_bucket: "bkt".into(),
-            src_key: "ghost.txt".into(),
-            dst_bucket: "bkt".into(),
-            dst_key: "dst.txt".into(),
-            metadata_directive: None,
-            source_conditions: IfConditions::default(),
-        }).unwrap_err();
+        store
+            .create_bucket(CreateBucketInput {
+                bucket: "bkt".into(),
+            })
+            .unwrap();
+        let err = store
+            .copy_object(CopyObjectInput {
+                src_bucket: "bkt".into(),
+                src_key: "ghost.txt".into(),
+                dst_bucket: "bkt".into(),
+                dst_key: "dst.txt".into(),
+                metadata_directive: None,
+                source_conditions: IfConditions::default(),
+            })
+            .unwrap_err();
         assert_eq!(err.code(), "NoSuchKey");
     }
 }

@@ -127,7 +127,10 @@ mod tests {
 
     #[test]
     fn no_such_key_code() {
-        let e = Fals3Error::NoSuchKey { bucket: "b".into(), key: "k".into() };
+        let e = Fals3Error::NoSuchKey {
+            bucket: "b".into(),
+            key: "k".into(),
+        };
         assert_eq!(e.code(), "NoSuchKey");
         assert_eq!(e.http_status(), 404);
     }
@@ -140,7 +143,7 @@ mod tests {
 
     #[test]
     fn io_error_maps_to_internal() {
-        let e = Fals3Error::Io(std::io::Error::new(std::io::ErrorKind::Other, "disk full"));
+        let e = Fals3Error::Io(std::io::Error::other("disk full"));
         assert_eq!(e.code(), "InternalError");
         assert_eq!(e.http_status(), 500);
     }
